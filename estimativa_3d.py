@@ -3,149 +3,149 @@ import pandas as pd
 import os
 from datetime import datetime
 
-st.set_page_config(page_title="Estimativa Rápida 3D", layout="centered")
+st.set_page_config(page_title="Gestão 3D", layout="centered")
 
-st.title("⚡ Estimativa Rápida de Orçamento 3D")
-st.markdown("Insira os parâmetros abaixo para calcular o preço final estimado para o cliente.")
+# 1. Definição dos Ficheiros de Base de Dados
+CSV_HISTORICO = "historico_orcamentos.csv"
+CSV_MATERIAIS = "base_materiais.csv"
 
-# Nome do ficheiro da base de dados
-CSV_FILE = "historico_orcamentos.csv"
+# 2. Criar a base de dados de materiais automaticamente se for a primeira vez
+if not os.path.isfile(CSV_MATERIAIS):
+    df_default = pd.DataFrame([
+        {"Material": "PLA Padrão", "Preco_Bobina": 20.0, "Peso_Bobina": 1000.0, "Consumo_kW": 0.150},
+        {"Material": "PETG Padrão", "Preco_Bobina": 22.0, "Peso_Bobina": 1000.0, "Consumo_kW": 0.200},
+        {"Material": "PA-CF (Nylon Carbono)", "Preco_Bobina": 65.0, "Peso_Bobina": 500.0, "Consumo_kW": 0.300}
+    ])
+    df_default.to_csv(CSV_MATERIAIS, index=False)
 
-# Base de Dados Dinâmica de Materiais (Preço €, Peso g, Consumo kW)
-MATERIAIS = {
-    "PLA": {"preco": 20.0, "peso": 1000.0, "consumo": 0.150},
-    "PETG": {"preco": 22.0, "peso": 1000.0, "consumo": 0.200},
-    "ABS / ASA": {"preco": 25.0, "peso": 1000.0, "consumo": 0.250},
-    "TPU (Flexível)": {"preco": 35.0, "peso": 1000.0, "consumo": 0.150},
-    "PA-CF (Nylon Fibra de Carbono)": {"preco": 65.0, "peso": 500.0, "consumo": 0.300}
-}
+# Carregar os materiais guardados
+df_materiais = pd.read_csv(CSV_MATERIAIS)
 
-# Constantes Fixas da Empresa
-CUSTO_KWH = 0.16     # €
+# 3. Constantes Fixas da Máquina/Empresa
+CUSTO_KWH = 0.16
 CUSTO_MAQUINA = 800.0
 VIDA_UTIL_HORAS = 8000.0
-TEMPO_SETUP_POR_PECA = 0.1 # horas (6 min)
-VALOR_HORA_SETUP = 15.0 # €
-MARGEM_LUCRO_DEFAULT = 30 # %
+TEMPO_SETUP = 0.1
+VALOR_HORA_SETUP = 15.0
 
+st.title("🖨️ Gestão de Orçamentos 3D")
 st.divider()
 
-# Formulário para podermos submeter e limpar os dados facilmente
-with st.form("orcamento_form"):
-    
-    # Secção: Informações do Cliente/Projeto (Novo)
-    st.subheader("📝 Dados do Projeto")
-    col_proj1, col_proj2 = st.columns(2)
-    with col_proj1:
-        nome_cliente = st.text_input("Nome do Cliente / Projeto", placeholder="Ex: Peça R&D Motor v2")
-    with col_proj2:
-        responsavel = st.text_input("Responsável", placeholder="O teu nome")
+# 4. Criar Navegação por Separadores
+tab1, tab2, tab3 = st.tabs(["⚡ Calculadora", "🛠️ Inventário de Materiais", "📂 Histórico"])
 
-    # Secção: Seleção de Material
-    st.subheader("⚙️ Configuração do Material")
-    material_selecionado = st.selectbox("Escolha o tipo de filamento:", list(MATERIAIS.keys()))
+# ==========================================
+# SEPARADOR 1: CALCULADORA
+# ==========================================
+with tab1:
+    with st.form("orcamento_form"):
+        st.subheader("📝 Dados do Projeto")
+        col_proj1, col_proj2 = st.columns(2)
+        with col_proj1:
+            nome_cliente = st.text_input("Cliente / Projeto", placeholder="Ex: Peça R&D Motor v2")
+        with col_proj2:
+            numero_pecas = st.number_input("Quantidade de Peças", min_value=1, value=1)
 
-    preco_base = MATERIAIS[material_selecionado]["preco"]
-    peso_base = MATERIAIS[material_selecionado]["peso"]
-    consumo_base = MATERIAIS[material_selecionado]["consumo"]
-
-    col_mat1, col_mat2, col_mat3 = st.columns(3)
-    with col_mat1:
-        preco_bobina = st.number_input("Preço da Bobina (€)", value=preco_base, step=1.0)
-    with col_mat2:
-        peso_bobina = st.number_input("Peso da Bobina (g)", value=peso_base, step=100.0)
-    with col_mat3:
-        consumo_impressora = st.number_input("Consumo Máquina (kW)", value=consumo_base, step=0.05)
-
-    st.divider()
-
-    # Inputs Originais
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📦 Parâmetros do Pedido")
-        peso_1_peca = st.number_input("Peso de 1 Peça (gramas)", min_value=0.0, value=50.0, step=1.0)
-        tempo_1_impressao = st.number_input("Tempo de 1 Impressão (horas)", min_value=0.0, value=2.5, step=0.5)
-
-    with col2:
-        st.subheader("📈 Volume e Margem")
-        numero_pecas = st.number_input("Número de Peças", min_value=1, value=1, step=1)
-        margem_lucro = st.slider("Margem de Lucro (%)", min_value=0, max_value=200, value=MARGEM_LUCRO_DEFAULT)
+        st.subheader("⚙️ Seleção de Material")
+        # A dropdown agora lê diretamente da base de dados CSV visual
+        lista_materiais = df_materiais["Material"].tolist()
+        material_escolhido = st.selectbox("Escolhe o filamento da tua base:", lista_materiais)
         
-    # Botão de submissão do formulário
-    calcular = st.form_submit_button("Calcular e Guardar Orçamento", use_container_width=True)
+        # Isolar os dados do material selecionado
+        dados_mat = df_materiais[df_materiais["Material"] == material_escolhido].iloc[0]
 
-# Lógica após submeter o formulário
-if calcular:
-    if not nome_cliente:
-        st.warning("⚠️ Por favor, insere o Nome do Cliente ou Projeto para poder guardar no histórico.")
-    else:
-        # Cálculos
-        peso_total = peso_1_peca * numero_pecas
-        tempo_total = tempo_1_impressao * numero_pecas
-        tempo_setup_total = TEMPO_SETUP_POR_PECA * numero_pecas
+        st.subheader("📦 Parâmetros de Impressão")
+        colA, colB = st.columns(2)
+        with colA:
+            peso_1_peca = st.number_input("Peso de 1 Peça (gramas)", min_value=0.0, value=50.0)
+        with colB:
+            tempo_1_impressao = st.number_input("Tempo de 1 Impressão (horas)", min_value=0.0, value=2.5)
 
-        custo_material = (peso_total / peso_bobina) * preco_bobina
-        custo_energia = tempo_total * consumo_impressora * CUSTO_KWH
-        custo_depreciacao = tempo_total * (CUSTO_MAQUINA / VIDA_UTIL_HORAS)
-        custo_trabalho = tempo_setup_total * VALOR_HORA_SETUP
+        margem_lucro = st.slider("Margem de Lucro (%)", 0, 200, 30)
+        calcular = st.form_submit_button("Calcular e Guardar", use_container_width=True)
 
-        custo_producao = custo_material + custo_energia + custo_depreciacao + custo_trabalho
-        preco_final = custo_producao * (1 + (margem_lucro / 100))
-        
-        # Obter data e hora atuais
-        data_hora_atual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Preparar dados para o DataFrame
-        novo_registo = pd.DataFrame([{
-            "Data/Hora": data_hora_atual,
-            "Projeto/Cliente": nome_cliente,
-            "Responsável": responsavel if responsavel else "N/A",
-            "Material": material_selecionado,
-            "Peso Peça(g)": peso_1_peca,
-            "Tempo Peça(h)": tempo_1_impressao,
-            "Quantidade": numero_pecas,
-            "Custo Produção(€)": round(custo_producao, 2),
-            "Margem(%)": margem_lucro,
-            "Preço Final(€)": round(preco_final, 2)
-        }])
-
-        # Lógica para guardar no CSV
-        if os.path.isfile(CSV_FILE):
-            # Se o ficheiro existe, carrega e anexa
-            df_existente = pd.read_csv(CSV_FILE)
-            df_atualizado = pd.concat([df_existente, novo_registo], ignore_index=True)
+    if calcular:
+        if not nome_cliente:
+            st.warning("⚠️ Insere o nome do Cliente/Projeto para guardar.")
         else:
-            # Se não existe, cria um novo
-            df_atualizado = novo_registo
+            peso_total = peso_1_peca * numero_pecas
+            tempo_total = tempo_1_impressao * numero_pecas
             
-        # Gravar no ficheiro
-        df_atualizado.to_csv(CSV_FILE, index=False)
-        
-        st.divider()
-        st.subheader("💰 Estimativa Final")
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.info(f"**Custo de Produção:** € {custo_producao:.2f}")
-        with col_b:
-            st.success(f"**Preço a Cobrar:** € {preco_final:.2f}")
+            # Cálculos usando as variáveis do CSV
+            custo_mat = (peso_total / dados_mat["Peso_Bobina"]) * dados_mat["Preco_Bobina"]
+            custo_ene = tempo_total * dados_mat["Consumo_kW"] * CUSTO_KWH
+            custo_dep = tempo_total * (CUSTO_MAQUINA / VIDA_UTIL_HORAS)
+            custo_trab = (TEMPO_SETUP * numero_pecas) * VALOR_HORA_SETUP
+
+            custo_prod = custo_mat + custo_ene + custo_dep + custo_trab
+            preco_final = custo_prod * (1 + (margem_lucro / 100))
             
-        st.toast(f"✅ Orçamento de '{nome_cliente}' guardado com sucesso no histórico!", icon="💾")
+            # Guardar Histórico
+            novo_registo = pd.DataFrame([{
+                "Data": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "Projeto": nome_cliente,
+                "Material Usado": material_escolhido,
+                "Quantidade": numero_pecas,
+                "Custo Prod(€)": round(custo_prod, 2),
+                "Preço Final(€)": round(preco_final, 2)
+            }])
+            
+            if os.path.isfile(CSV_HISTORICO):
+                df_hist = pd.concat([pd.read_csv(CSV_HISTORICO), novo_registo], ignore_index=True)
+            else:
+                df_hist = novo_registo
+            df_hist.to_csv(CSV_HISTORICO, index=False)
+            
+            st.success(f"**Preço Final a Cobrar:** € {preco_final:.2f}")
+            st.info(f"*(Custo de Produção Base: € {custo_prod:.2f})*")
 
-st.divider()
-
-# Secção de Visualização do Histórico
-st.subheader("📂 Histórico de Orçamentos")
-if os.path.isfile(CSV_FILE):
-    df_historico = pd.read_csv(CSV_FILE)
-    st.dataframe(df_historico, use_container_width=True)
+# ==========================================
+# SEPARADOR 2: GESTÃO DE INVENTÁRIO
+# ==========================================
+with tab2:
+    st.subheader("Base de Dados de Filamentos")
+    st.dataframe(df_materiais, use_container_width=True)
     
-    # Botão para descarregar o Excel/CSV para a contabilidade
-    csv = df_historico.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Descarregar Histórico (CSV)",
-        data=csv,
-        file_name='historico_orcamentos_3d.csv',
-        mime='text/csv',
-    )
-else:
-    st.info("Nenhum orçamento guardado ainda. Faz o teu primeiro cálculo acima.")
+    st.markdown("#### Adicionar Novo Rolo ao Inventário")
+    with st.form("add_material_form"):
+        n_nome = st.text_input("Nome do Material (Marca/Cor)", placeholder="Ex: Esun PLA+ Preto")
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            n_preco = st.number_input("Preço da Bobina (€)", min_value=0.0, value=25.0)
+        with col_m2:
+            n_peso = st.number_input("Peso da Bobina (g)", min_value=1.0, value=1000.0)
+        with col_m3:
+            n_consumo = st.number_input("Consumo Máquina (kW)", min_value=0.0, value=0.150, step=0.05)
+        
+        adicionar = st.form_submit_button("Guardar Novo Material", type="primary")
+        
+    if adicionar and n_nome:
+        novo_mat = pd.DataFrame([{
+            "Material": n_nome, 
+            "Preco_Bobina": n_preco, 
+            "Peso_Bobina": n_peso, 
+            "Consumo_kW": n_consumo
+        }])
+        df_atualizado = pd.concat([df_materiais, novo_mat], ignore_index=True)
+        df_atualizado.to_csv(CSV_MATERIAIS, index=False)
+        st.success(f"Material '{n_nome}' adicionado com sucesso!")
+        st.rerun() # Atualiza a página automaticamente para o material aparecer na tabela e na calculadora
+
+# ==========================================
+# SEPARADOR 3: HISTÓRICO
+# ==========================================
+with tab3:
+    st.subheader("Histórico Financeiro")
+    if os.path.isfile(CSV_HISTORICO):
+        df_historico = pd.read_csv(CSV_HISTORICO)
+        st.dataframe(df_historico, use_container_width=True)
+        
+        st.download_button(
+            label="📥 Descarregar para Excel (CSV)",
+            data=df_historico.to_csv(index=False).encode('utf-8'),
+            file_name='faturacao_3d.csv',
+            mime='text/csv'
+        )
+    else:
+        st.info("Ainda não há orçamentos guardados. Eles aparecerão aqui.")
