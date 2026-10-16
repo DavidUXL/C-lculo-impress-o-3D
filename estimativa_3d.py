@@ -100,7 +100,8 @@ with tab1:
             custo_trab_final = ((tempo_setup_real * numero_pecas) + tempo_pos) * VALOR_HORA_TRABALHO
 
             custo_prod_total = custo_mat_final + custo_ene_final + custo_dep_final + custo_trab_final
-            preco_final = custo_prod_total * (1 + (margem_lucro / 100))
+            lucro_liquido = custo_prod_total * (margem_lucro / 100)
+            preco_final = custo_prod_total + lucro_liquido
             
             mat_str = " | ".join(set(materiais_usados))
             
@@ -110,6 +111,7 @@ with tab1:
                 "Materiais Usados": mat_str,
                 "Qtd": numero_pecas,
                 "Custo Prod(€)": round(custo_prod_total, 2),
+                "Lucro Líquido(€)": round(lucro_liquido, 2),
                 "Preço Final(€)": round(preco_final, 2)
             }])
             
@@ -119,14 +121,14 @@ with tab1:
                 df_hist = novo_registo
             df_hist.to_csv(CSV_HISTORICO, index=False)
             
-            st.success(f"**Preço Final a Cobrar ao Cliente:** € {preco_final:.2f}")
+            st.success(f"**Preço Final a Cobrar ao Cliente:** € {preco_final:.2f} *(Lucro: € {lucro_liquido:.2f})*")
             
             # --- ADIÇÃO DAS LEGENDAS E FÓRMULAS ---
-            st.write("📊 **Breakdown de Custos de Produção (Lote Total):**")
-            col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+            st.write("📊 **Breakdown de Custos e Margem (Lote Total):**")
+            col_res1, col_res2, col_res3, col_res4, col_res5 = st.columns(5)
             
             col_res1.metric(
-                "Material + Purga", 
+                "Material", 
                 f"€ {custo_mat_final:.2f}",
                 help="Soma do custo de cada filamento pelo seu peso + o custo da torre de purga, ajustado pela margem de risco."
             )
@@ -136,7 +138,7 @@ with tab1:
                 help=f"Tempo Total × Consumo Médio Máquina ({consumo_final_kw:.3f} kW) × Preço kWh (€{CUSTO_KWH}), ajustado pelo risco."
             )
             col_res3.metric(
-                "Máquina (Desgaste)", 
+                "Máquina", 
                 f"€ {custo_dep_final:.2f}",
                 help=f"Depreciação: Tempo de Impressão × (Custo U1: €{CUSTO_MAQUINA} / Vida Útil: {VIDA_UTIL_HORAS}h)."
             )
@@ -145,6 +147,11 @@ with tab1:
                 f"€ {custo_trab_final:.2f}",
                 help=f"Setup ({tempo_setup_real:.2f}h por peça) + Pós-Processamento ({tempo_pos}h) × Valor/Hora (€{VALOR_HORA_TRABALHO})."
             )
+            col_res5.metric(
+                "Lucro Líquido", 
+                f"€ {lucro_liquido:.2f}",
+                help=f"Margem de {margem_lucro}% aplicada sobre o custo total de produção (€{custo_prod_total:.2f})."
+            )
             
             with st.expander("Ver descritivo matemático completo"):
                 st.markdown(f"""
@@ -152,6 +159,7 @@ with tab1:
                 **2. Energia:** {tempo_total}h totais × {consumo_final_kw:.3f} kW/h × €{CUSTO_KWH}/kWh × Multiplicador de risco.
                 **3. Depreciação:** {tempo_total}h totais × (€{CUSTO_MAQUINA} / {VIDA_UTIL_HORAS}h) × Multiplicador de risco.
                 **4. Mão de Obra:** Setup inicial ajustado a {num_cabecas} cabeça(s) = {tempo_setup_real:.2f}h × {numero_pecas} peças, mais {tempo_pos}h de pós-processamento, a €{VALOR_HORA_TRABALHO}/hora.
+                **5. Lucro Líquido:** Custo total de produção (€{custo_prod_total:.2f}) × Margem definida ({margem_lucro}%) = €{lucro_liquido:.2f}.
                 """)
 
 with tab2:
