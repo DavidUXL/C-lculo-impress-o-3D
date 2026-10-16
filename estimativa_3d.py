@@ -121,12 +121,38 @@ with tab1:
             
             st.success(f"**Preço Final a Cobrar ao Cliente:** € {preco_final:.2f}")
             
+            # --- ADIÇÃO DAS LEGENDAS E FÓRMULAS ---
             st.write("📊 **Breakdown de Custos de Produção (Lote Total):**")
             col_res1, col_res2, col_res3, col_res4 = st.columns(4)
-            col_res1.metric("Material + Purga", f"€ {custo_mat_final:.2f}")
-            col_res2.metric("Energia", f"€ {custo_ene_final:.2f}")
-            col_res3.metric("Máquina", f"€ {custo_dep_final:.2f}")
-            col_res4.metric("Mão de Obra", f"€ {custo_trab_final:.2f}")
+            
+            col_res1.metric(
+                "Material + Purga", 
+                f"€ {custo_mat_final:.2f}",
+                help="Soma do custo de cada filamento pelo seu peso + o custo da torre de purga, ajustado pela margem de risco."
+            )
+            col_res2.metric(
+                "Energia", 
+                f"€ {custo_ene_final:.2f}",
+                help=f"Tempo Total × Consumo Médio Máquina ({consumo_final_kw:.3f} kW) × Preço kWh (€{CUSTO_KWH}), ajustado pelo risco."
+            )
+            col_res3.metric(
+                "Máquina (Desgaste)", 
+                f"€ {custo_dep_final:.2f}",
+                help=f"Depreciação: Tempo de Impressão × (Custo U1: €{CUSTO_MAQUINA} / Vida Útil: {VIDA_UTIL_HORAS}h)."
+            )
+            col_res4.metric(
+                "Mão de Obra", 
+                f"€ {custo_trab_final:.2f}",
+                help=f"Setup ({tempo_setup_real:.2f}h por peça) + Pós-Processamento ({tempo_pos}h) × Valor/Hora (€{VALOR_HORA_TRABALHO})."
+            )
+            
+            with st.expander("Ver descritivo matemático completo"):
+                st.markdown(f"""
+                **1. Material:** Custo Base + Desperdício Torre = €{custo_materiais_total:.2f} / peça. Multiplicado por {numero_pecas} peças e adicionado o risco de falha ({taxa_falha}%).
+                **2. Energia:** {tempo_total}h totais × {consumo_final_kw:.3f} kW/h × €{CUSTO_KWH}/kWh × Multiplicador de risco.
+                **3. Depreciação:** {tempo_total}h totais × (€{CUSTO_MAQUINA} / {VIDA_UTIL_HORAS}h) × Multiplicador de risco.
+                **4. Mão de Obra:** Setup inicial ajustado a {num_cabecas} cabeça(s) = {tempo_setup_real:.2f}h × {numero_pecas} peças, mais {tempo_pos}h de pós-processamento, a €{VALOR_HORA_TRABALHO}/hora.
+                """)
 
 with tab2:
     st.subheader("Base de Dados de Filamentos")
